@@ -5,8 +5,6 @@ package node.message;
  */
 public enum MessageType {
     REGULAR,
-    ACK,
-    RELEASE,
     /**
      * Message sent when state recording is performed
      */

@@ -57,6 +57,11 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     private long[] state;
 
     /**
+     *
+     */
+    private boolean localStateRecorded;
+
+    /**
      * Class Constructor
      *
      * @param registry a reference to the RMI registry
@@ -143,7 +148,11 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                 // TODO: Do something with message
 
                 if(message.getType().equals(MessageType.MARKER)){
-                    // TODO: Add algorithm for receiving markers
+                    if(!localStateRecorded){
+                        // TODO: record state of c as empty and start procedure record_and_send_markers
+                    } else {
+                        // TODO: record state of c as contents of B_c
+                    }
                 }
             }
 
@@ -158,7 +167,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         /* The infinite loop */
         while(true) {
 
-            //receiveMessages();
+            processMessages();
 
             try {
                 Thread.sleep(1000);
