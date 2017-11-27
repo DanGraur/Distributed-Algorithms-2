@@ -1,13 +1,16 @@
 package node;
 
 import node.message.Message;
+import node.message.MessageType;
 import node.remote.CommunicationChannel;
 
 import java.io.Serializable;
 import java.rmi.NotBoundException;
+import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -67,7 +70,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         this.incomingLinks = new HashMap<>();
         this.outgoingLinks = new HashMap<>();
 
-        this.state = new long[numberOfProcesses - 1];
+        this.state = new long[2 * (numberOfProcesses - 1)];
     }
 
     /**
@@ -123,12 +126,39 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         incomingLinks.get(message.getProcName()).add(message);
     }
 
+    /**
+     * Deliver all messages that have been received.
+     */
+    public void processMessages() {
+        Iterator it = incomingLinks.entrySet().iterator();
+
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry) it.next();
+            Queue<Message> messages = incomingLinks.get(pair.getKey());
+
+            while (!messages.isEmpty()) {
+                // Deliver each message
+                Message message = messages.poll();
+
+                // TODO: Do something with message
+
+                if(message.getType().equals(MessageType.MARKER)){
+                    // TODO: Add algorithm for receiving markers
+                }
+            }
+
+            it.remove();
+        }
+
+    }
+
     @Override
     public void run() {
 
         /* The infinite loop */
         while(true) {
 
+            //receiveMessages();
 
             try {
                 Thread.sleep(1000);

@@ -10,5 +10,5 @@ public enum MessageType {
     /**
      * Message sent when state recording is performed
      */
-    REC_STATE
+    MARKER
 }
