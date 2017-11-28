@@ -25,6 +25,7 @@ public class RegistryServer {
             System.out.println(s);
         }*/
 
+        /* Just wait indefinitely for input */
         System.in.read();
     }
 }

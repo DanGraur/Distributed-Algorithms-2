@@ -5,14 +5,11 @@ import node.message.MessageType;
 import node.remote.CommunicationChannel;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.rmi.NotBoundException;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /**
@@ -47,7 +44,12 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     private Map<String, CommunicationChannel> outgoingLinks;
 
     /**
-     * The node's clock
+     * This queue is used as an initial buffer at the process' input, in order to avoid heavy computation in the sendMessage method
+     */
+    private List<Message> separatingQueue;
+
+    /**
+     * The node's clock; used for assigning the id of the outgoing messages
      */
     private long sClock;
 
@@ -57,9 +59,19 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     private long[] state;
 
     /**
-     *
+     * Indicates if the local state is being recorded
      */
     private boolean localStateRecorded;
+
+    /**
+     * Last stable state; indicates the last recorded state
+     */
+    private long[] lastRecordedState;
+
+    /**
+     * Will hold a set of names of the processes which are expected to produce a marker
+     */
+    private Set<String> awaitingMarker;
 
     /**
      * Class Constructor
@@ -74,8 +86,16 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         this.pid = pid;
         this.incomingLinks = new HashMap<>();
         this.outgoingLinks = new HashMap<>();
+        this.awaitingMarker = new HashSet<>();
 
-        this.state = new long[2 * (numberOfProcesses - 1)];
+        this.separatingQueue = new ArrayList<>();
+
+        /*
+         * Assume that in the first half one holds the last received time message
+         * from that process, and in the latter half, the last sent message
+         */
+        this.state = new long[numberOfProcesses - 1];
+        this.state = new long[numberOfProcesses - 1];
     }
 
     /**
@@ -124,22 +144,93 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
      */
     @Override
     public void sendMessage(Message message) throws RemoteException {
-        long sourcePid = message.getPid();
+        /* Add the message to the buffer queue */
+        separatingQueue.add(message);
+    }
 
-        state[(int) sourcePid] = Math.max(message.getsClock(), sClock) + 1;
+    /**
+     * Process messages which have been stored in the process' input buffer
+     */
+    public void processIncomingMessages() throws RemoteException {
 
-        incomingLinks.get(message.getProcName()).add(message);
+        for (Iterator<Message> iterator = separatingQueue.iterator(); iterator.hasNext(); ) {
+
+            Message message = iterator.next();
+
+            /* Get the source's PID to increase efficiency */
+            long sourcePid = message.getPid();
+
+            /* We should check that indeed the new value will be maximal. It should never happen, but just to make sure */
+            state[(int) sourcePid * 2] = Math.max(message.getsClock(), state[(int) sourcePid * 2]);
+
+            /* If the system is currently recording its state */
+            if (localStateRecorded) {
+                if (message.getType() == MessageType.MARKER) {
+                    awaitingMarker.remove(message.getProcName());
+
+                    /* If no more processes require ack */
+                    if (awaitingMarker.isEmpty()) {
+                        // TODO: add state aggregation; i.e. collect all states and write them to permanent storage
+                    }
+                } else
+                    /* Add the message to its corresponding queue */
+                    incomingLinks.get(message.getProcName()).add(message);
+            } else if (message.getType() == MessageType.MARKER) {
+                /* If marker message, then prepare for state; else drop regular messages since they are irrelevant  */
+                localStateRecorded = true;
+
+                /* Store the current state, as the recorded state */
+                lastRecordedState = Arrays.copyOf(state, state.length);
+
+                /* Configure the names of the processes from which markers will be required. Remove source, and this node */
+                awaitingMarker.addAll(incomingLinks.keySet());
+                awaitingMarker.remove(message.getProcName());
+                awaitingMarker.remove(name);
+
+                /* Make sure all queues are clear before proceeding */
+                for (Queue<Message> messages : incomingLinks.values())
+                    messages.clear();
+
+                /* Send marker to the other processes, requesting they record their state */
+                sendMessageToEveryoneWithExceptions(
+                        new Message(
+                                pid,
+                                name,
+                                sClock++,
+                                MessageType.MARKER,
+                                "Requesting state"
+                        ),
+                        new HashSet<String>(Arrays.asList(message.getProcName(), name))
+                );
+            }
+
+            iterator.remove();
+        }
+
+    }
+
+    /**
+     * Send a message to all other peers (including itself)
+     *
+     * @param message the message being sent
+     * @param exception a set of String identifying processes to which one shouldn't send the message
+     * @throws RemoteException
+     */
+    private void sendMessageToEveryoneWithExceptions(Message message, Set exception) throws RemoteException {
+
+        for (Map.Entry<String, CommunicationChannel> stringCommunicationChannelEntry : outgoingLinks.entrySet())
+            if (!exception.contains(stringCommunicationChannelEntry.getKey()))
+                stringCommunicationChannelEntry.getValue().sendMessage(message);
+
     }
 
     /**
      * Deliver all messages that have been received.
      */
-    public void processMessages() {
-        Iterator it = incomingLinks.entrySet().iterator();
+    public void processReceivedMessages() {
 
-        while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry) it.next();
-            Queue<Message> messages = incomingLinks.get(pair.getKey());
+        for (Map.Entry<String, Queue<Message>> stringQueueEntry : incomingLinks.entrySet()) {
+            Queue<Message> messages = stringQueueEntry.getValue();
 
             while (!messages.isEmpty()) {
                 // Deliver each message
@@ -155,19 +246,37 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                     }
                 }
             }
-
-            it.remove();
         }
+
+
 
     }
 
     @Override
     public void run() {
 
+        /* Find peers, and establish incoming, and outgoing connections to them */
+        try {
+            findPeers();
+        } catch (Exception e) {
+            System.err.println("Encountered some error: " + e.getMessage());
+
+            e.printStackTrace();
+
+            System.exit(0xFF);
+        }
+
         /* The infinite loop */
         while(true) {
 
-            processMessages();
+            try {
+                processIncomingMessages();
+            } catch (RemoteException e) {
+                System.err.println("Encountered an RMI error: " + e.getMessage());
+
+                e.printStackTrace();
+            }
+            // processReceivedMessages();
 
             try {
                 Thread.sleep(1000);
