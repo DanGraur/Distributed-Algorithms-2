@@ -80,6 +80,11 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     private PrintWriter log;
 
     /**
+     * Will hold the communication channels to the other peers
+     */
+    private Map<String, CommunicationChannel> peers;
+
+    /**
      * Class Constructor
      *
      * @param registry a reference to the RMI registry
@@ -111,6 +116,16 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
          * from that process, and in the latter half, the last sent message
          */
         this.state = new long[2 * numberOfProcesses];
+    }
+
+    public void setPeers(Map<String, CommunicationChannel> peers) {
+        this.peers = peers;
+        log.print(new Date().toString() + " Set new peers with process ids: ");
+        for(String peerID : peers.keySet()){
+            log.print(peerID + " ");
+        }
+        log.println();
+        log.flush();
     }
 
     /**
@@ -174,6 +189,21 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
         separatingQueue.add(message);
 
+    }
+
+    /**
+     * Send a message to all other peers (including itself)
+     *
+     * @param message the message being sent
+     * @throws RemoteException
+     */
+    private void sendMessageToOutgoingLinks(Message message) throws RemoteException {
+        for(Iterator<Map.Entry<String, CommunicationChannel>> entryIterator = outgoingLinks.entrySet().iterator();
+            entryIterator.hasNext();){
+            Map.Entry<String, CommunicationChannel> pair = entryIterator.next();
+
+            pair.getValue().sendMessage(message);
+        }
     }
 
     /**
@@ -250,6 +280,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
                     /* Add the message to its corresponding queue */
                     if(awaitingMarker.contains(message.getProcName())){
+                        System.out.println("-----------------------------------------");
                         incomingLinks.get(message.getProcName()).add(message);
                     }
 
@@ -341,7 +372,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                 log.println(new Date().toString() + " This component has send the first REGULAR message. ");
                 log.flush();
                 Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "First message from component" + pid);
-                sendMessage(message);
+                sendMessageToOutgoingLinks(message);
             } catch (RemoteException e){
                 e.printStackTrace();
             }
@@ -379,7 +410,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                 log.println(new Date().toString() + " This component has send the second REGULAR message. ");
                 log.flush();
                 Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "Second message from component " + pid);
-                sendMessage(message);
+                sendMessageToOutgoingLinks(message);
             } catch (RemoteException e){
                 e.printStackTrace();
             }
