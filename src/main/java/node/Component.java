@@ -4,6 +4,9 @@ import node.message.Message;
 import node.message.MessageType;
 import node.remote.CommunicationChannel;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -73,6 +76,8 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
      */
     private Set<String> awaitingMarker;
 
+    private PrintWriter log;
+
     /**
      * Class Constructor
      *
@@ -80,6 +85,16 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
      * @param numberOfProcesses the total number of nodes in the system
      */
     public Component(String name, long pid, Registry registry, int numberOfProcesses) {
+        try{
+            String path = new File("").getAbsolutePath();
+            if(path.contains("target\\classes")) path = path.replace("target\\classes", "");
+            log = new PrintWriter(path + "/logs/log_component_" + pid + ".txt", "UTF-8");
+            log.println(new Date().toString() + " Initialized Component with process id " + pid);
+            log.flush();
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+
         this.registry = registry;
 
         this.name = name;
@@ -163,6 +178,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         while (!separatingQueue.isEmpty()) {
             Message message = separatingQueue.poll();
 
+            log.println(new Date().toString() + " Received message: " + message.toString());
             System.out.println("(" + pid + ") Received a message: " + message.toString());
 
             /* Get the source's PID to increase efficiency */
@@ -173,29 +189,45 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
             /* If the system is currently recording its state */
             if (localStateRecorded) {
+                log.println(new Date().toString() + " Local state was recorded and now processing message ");
                 if (message.getType() == MessageType.MARKER) {
+                    log.println(new Date().toString() + " Marker received from component " +  message.getPid() +
+                            " and can be removed from awaited markers");
                     awaitingMarker.remove(message.getProcName());
 
                     /* If no more processes require ack */
                     if (awaitingMarker.isEmpty()) {
+                        log.println(new Date().toString() + " Received all expected markers, " +
+                                "finished recording local recorded state: " + Arrays.toString(lastRecordedState));
                         System.out.println("(" + pid + ") Finished recording my own state: " + Arrays.toString(lastRecordedState));
                         System.out.println("(" + pid + ") Following are the link states:");
 
                         /* Print the states of the incoming links */
-                        for (Iterator<Map.Entry<String, Queue<Message>>> entryIterator = incomingLinks.entrySet().iterator(); entryIterator.hasNext(); ) {
+                        log.println(new Date().toString() + " Now printing all states of the incoming links: ");
+
+                        for (Iterator<Map.Entry<String, Queue<Message>>> entryIterator = incomingLinks.entrySet().iterator();
+                             entryIterator.hasNext(); ) {
                             Map.Entry<String, Queue<Message>> pair = entryIterator.next();
 
                             Queue<Message> queue = pair.getValue();
 
                             System.out.println("(" + pid + ") Incoming link from " + pair.getKey());
+                            log.println(new Date().toString() + " Incoming link from: " + pair.getKey());
 
-                            for (Message queueMessage : queue)
-                                System.out.println("(" + pid + ") : " + queueMessage.getsClock());
+                            if(queue.isEmpty()){
+                                log.println(new Date().toString() + " Message queue of link is empty ");
+                            } else {
+                                for (Message queueMessage : queue) {
+                                    log.println(new Date().toString() + " Message clock in link: " + queueMessage.getsClock());
+                                    System.out.println("(" + pid + ") : " + queueMessage.getsClock());
+                                }
+                            }
 
                             queue.clear();
                             entryIterator.remove();
 
                             /* The process is no longer recording its state */
+                            log.println(new Date().toString() + " Setting localStateRecorded back to false");
                             localStateRecorded = false;
                         }
                     }
@@ -203,11 +235,13 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                     /* Add the message to its corresponding queue */
                     incomingLinks.get(message.getProcName()).add(message);
             } else if (message.getType() == MessageType.MARKER) {
+                log.println(new Date().toString() + " Local state was not yet recorded and will now occur ");
                 /* If marker message, then prepare for state; else drop regular messages since they are irrelevant  */
                 localStateRecorded = true;
 
                 /* Store the current state, as the recorded state */
                 lastRecordedState = Arrays.copyOf(state, state.length);
+                log.println(new Date().toString() + " Local state recorded is now: " + Arrays.toString(lastRecordedState));
 
                 /* Configure the names of the processes from which markers will be required. Remove source, and this node */
                 awaitingMarker.addAll(incomingLinks.keySet());
@@ -219,6 +253,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                     messages.clear();
 
                 /* Send marker to the other processes, requesting they record their state */
+                log.println(new Date().toString() + " Now sending marker to other processes to request their state ");
                 sendMessageToEveryoneWithExceptions(
                         new Message(
                                 pid,
@@ -230,6 +265,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                         new HashSet<String>(Arrays.asList(name))
                 );
             }
+            log.flush();
         }
 
 //        synchronized (separatingQueue) {
@@ -287,6 +323,8 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             try {
                 sendMarker();
 
+                log.println(new Date().toString() + " This component has send the first MARKER. ");
+                log.flush();
                 System.out.println("Have sent marker: " + pid);
             } catch (RemoteException e) {
                 e.printStackTrace();

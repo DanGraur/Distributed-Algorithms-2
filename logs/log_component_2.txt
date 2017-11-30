@@ -1,0 +1,20 @@
+Thu Nov 30 19:43:36 CET 2017 Initialized Component with process id 2
+Thu Nov 30 19:43:36 CET 2017 This component has send the first MARKER. 
+Thu Nov 30 19:43:37 CET 2017 Received message: Message{messageId='290c52cc-f06e-491c-a0a3-ec65daadc43e', procName='0', pid=0, sClock=1, type=MARKER, contents='Requesting state', timestamp=Thu Nov 30 19:43:37 CET 2017, acks=[], canRelease=false}
+Thu Nov 30 19:43:37 CET 2017 Local state was recorded and now processing message 
+Thu Nov 30 19:43:37 CET 2017 Marker received from component 0 and can be removed from awaited markers
+Thu Nov 30 19:43:37 CET 2017 Received all expected markers, finished recording local recorded state: [0, 0, 0, 0, 0, 0]
+Thu Nov 30 19:43:37 CET 2017 Now printing all states of the incoming links: 
+Thu Nov 30 19:43:37 CET 2017 Incoming link from: 0
+Thu Nov 30 19:43:37 CET 2017 Message queue of link is empty 
+Thu Nov 30 19:43:37 CET 2017 Setting localStateRecorded back to false
+Thu Nov 30 19:43:37 CET 2017 Incoming link from: 1
+Thu Nov 30 19:43:37 CET 2017 Message queue of link is empty 
+Thu Nov 30 19:43:37 CET 2017 Setting localStateRecorded back to false
+Thu Nov 30 19:43:37 CET 2017 Incoming link from: 2
+Thu Nov 30 19:43:37 CET 2017 Message queue of link is empty 
+Thu Nov 30 19:43:37 CET 2017 Setting localStateRecorded back to false
+Thu Nov 30 19:43:37 CET 2017 Received message: Message{messageId='11f9da1e-8321-42b7-8bed-33dee9fbe679', procName='1', pid=1, sClock=1, type=MARKER, contents='Requesting state', timestamp=Thu Nov 30 19:43:37 CET 2017, acks=[], canRelease=false}
+Thu Nov 30 19:43:37 CET 2017 Local state was not yet recorded and will now occur 
+Thu Nov 30 19:43:37 CET 2017 Local state recorded is now: [1, 0, 1, 0, 0, 0]
+Thu Nov 30 19:43:37 CET 2017 Now sending marker to other processes to request their state 
