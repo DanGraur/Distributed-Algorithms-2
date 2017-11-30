@@ -9,6 +9,7 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
 import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /**
@@ -45,7 +46,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     /**
      * This queue is used as an initial buffer at the process' input, in order to avoid heavy computation in the sendMessage method
      */
-    private List<Message> separatingQueue;
+    private final Queue<Message> separatingQueue;
 
     /**
      * The node's clock; used for assigning the id of the outgoing messages
@@ -87,7 +88,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         this.outgoingLinks = new HashMap<>();
         this.awaitingMarker = new HashSet<>();
 
-        this.separatingQueue = new ArrayList<>();
+        this.separatingQueue = new LinkedBlockingQueue<>();
 
         /*
          * Assume that in the first half one holds the last received time message
@@ -113,6 +114,12 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                         new PriorityBlockingQueue<>()
                 );
         }
+
+        System.out.println(String.format("(%d) Printing my incoming links;", pid));
+        incomingLinks.forEach((key, value) -> System.out.println(String.format("(%d) Incoming: %s", pid, key)));
+
+        System.out.println(String.format("(%d) Printing my outgoing links;", pid));
+        outgoingLinks.forEach((key, value) -> System.out.println(String.format("(%d) Outgoing: %s", pid, key)));
         
     }
 
@@ -143,15 +150,20 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     @Override
     public void sendMessage(Message message) throws RemoteException {
         /* Add the message to the buffer queue */
+
         separatingQueue.add(message);
+
     }
 
     /**
      * Process messages which have been stored in the process' input buffer
      */
-    public void processIncomingMessages() throws RemoteException {
+    private void processIncomingMessages() throws RemoteException {
 
-        for (Message message : separatingQueue) {
+        while (!separatingQueue.isEmpty()) {
+            Message message = separatingQueue.poll();
+
+            System.out.println("(" + pid + ") Received a message: " + message.toString());
 
             /* Get the source's PID to increase efficiency */
             long sourcePid = message.getPid();
@@ -166,8 +178,8 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
                     /* If no more processes require ack */
                     if (awaitingMarker.isEmpty()) {
-                        System.out.println("Finished recording my own state: " + Arrays.toString(lastRecordedState));
-                        System.out.println("Following are the link states:");
+                        System.out.println("(" + pid + ") Finished recording my own state: " + Arrays.toString(lastRecordedState));
+                        System.out.println("(" + pid + ") Following are the link states:");
 
                         /* Print the states of the incoming links */
                         for (Iterator<Map.Entry<String, Queue<Message>>> entryIterator = incomingLinks.entrySet().iterator(); entryIterator.hasNext(); ) {
@@ -208,14 +220,18 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                         new Message(
                                 pid,
                                 name,
-                                sClock++,
+                                ++sClock,
                                 MessageType.MARKER,
                                 "Requesting state"
                         ),
-                        new HashSet<String>(Arrays.asList(message.getProcName(), name))
+                        new HashSet<String>(Arrays.asList(name))
                 );
             }
         }
+
+//        synchronized (separatingQueue) {
+//            separatingQueue.clear();
+//        }
 
     }
 
@@ -234,37 +250,9 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
     }
 
-    /**
-     * Deliver all messages that have been received.
-     */
-    public void processReceivedMessages() {
-
-        for (Map.Entry<String, Queue<Message>> stringQueueEntry : incomingLinks.entrySet()) {
-            Queue<Message> messages = stringQueueEntry.getValue();
-
-            while (!messages.isEmpty()) {
-                // Deliver each message
-                Message message = messages.poll();
-
-                // TODO: Do something with message
-
-                if(message.getType().equals(MessageType.MARKER)){
-                    if(!localStateRecorded){
-                        // TODO: record state of c as empty and start procedure record_and_send_markers
-                    } else {
-                        // TODO: record state of c as contents of B_c
-                    }
-                }
-            }
-        }
-
-
-
-    }
-
     private void sendMarker() throws RemoteException {
 
-        Message markerMessage = new Message(pid, name, sClock++, MessageType.MARKER, "This is a marker message");
+        Message markerMessage = new Message(pid, name, ++sClock, MessageType.MARKER, "This is a marker message");
 
         lastRecordedState = Arrays.copyOf(state, state.length);
         localStateRecorded = true;
@@ -278,6 +266,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     @Override
     public void run() {
 
+        System.out.println("I'm in the run method " + name);
 
 
         /* Find peers, and establish incoming, and outgoing connections to them */
@@ -291,9 +280,11 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             System.exit(0xFF);
         }
 
-        if (pid == 0)
+        if (pid == 2)
             try {
                 sendMarker();
+
+                System.out.println("Have sent marker: " + pid);
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
