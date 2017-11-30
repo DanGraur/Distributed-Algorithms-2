@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.rmi.NotBoundException;
+import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
 import java.util.*;
@@ -214,7 +215,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                             System.out.println("(" + pid + ") Incoming link from " + pair.getKey());
                             log.println(new Date().toString() + " Incoming link from: " + pair.getKey());
 
-                            if(queue.isEmpty()){
+                            if (queue.isEmpty()) {
                                 log.println(new Date().toString() + " Message queue of link is empty ");
                             } else {
                                 for (Message queueMessage : queue) {
@@ -225,15 +226,21 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
                             queue.clear();
                             entryIterator.remove();
-
-                            /* The process is no longer recording its state */
-                            log.println(new Date().toString() + " Setting localStateRecorded back to false");
-                            localStateRecorded = false;
                         }
+
+                        /* The process is no longer recording its state */
+                        log.println(new Date().toString() + " Setting localStateRecorded back to false");
+                        localStateRecorded = false;
                     }
-                } else
+                } else if(message.getType() == MessageType.REGULAR){
+                    log.println(new Date().toString() + " Received REGULAR message with content: " + message.getContents());
+
                     /* Add the message to its corresponding queue */
-                    incomingLinks.get(message.getProcName()).add(message);
+                    if(awaitingMarker.contains(message.getProcName())){
+                        incomingLinks.get(message.getProcName()).add(message);
+                    }
+
+                }
             } else if (message.getType() == MessageType.MARKER) {
                 log.println(new Date().toString() + " Local state was not yet recorded and will now occur ");
                 /* If marker message, then prepare for state; else drop regular messages since they are irrelevant  */
@@ -319,6 +326,17 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             System.exit(0xFF);
         }
 
+        // Randomly send a message as process 0
+        if(pid == 0){
+            try{
+                Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "First message from component" + pid);
+                sendMessage(message);
+            } catch (RemoteException e){
+                e.printStackTrace();
+            }
+        }
+
+        // Randomly try to record the global state as process 2
         if (pid == 2)
             try {
                 sendMarker();
@@ -329,6 +347,30 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
+
+        // Randomly send a message as process 1
+        if(pid == 1){
+            try {
+                processIncomingMessages();
+            } catch (RemoteException e) {
+                System.err.println("Encountered an RMI error: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            // Delay before sending a message
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            try{
+                Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "Second message from component " + pid);
+                sendMessage(message);
+            } catch (RemoteException e){
+                e.printStackTrace();
+            }
+        }
 
         /* The infinite loop */
         while(true) {
