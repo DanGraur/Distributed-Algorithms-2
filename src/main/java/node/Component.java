@@ -260,7 +260,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                                 log.println(new Date().toString() + " Message queue of link is empty ");
                             } else {
                                 for (Message queueMessage : queue) {
-                                    log.println(new Date().toString() + " Message clock in link: " + queueMessage.getsClock());
+                                    log.println(new Date().toString() + " Message clock and PID in link: (" + queueMessage.getPid() + ", " + queueMessage.getsClock() + ")");
                                     System.out.println("(" + pid + ") : " + queueMessage.getsClock());
                                 }
                             }
