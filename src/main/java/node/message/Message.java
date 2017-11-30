@@ -1,5 +1,6 @@
 package node.message;
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
@@ -8,7 +9,7 @@ import java.util.UUID;
 /**
  * @author Dan Graur 11/25/2017
  */
-public class Message implements Comparable {
+public class Message implements Comparable, Serializable {
 
     private String messageId;
     private String procName;

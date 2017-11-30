@@ -151,9 +151,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
      */
     public void processIncomingMessages() throws RemoteException {
 
-        for (Iterator<Message> iterator = separatingQueue.iterator(); iterator.hasNext(); ) {
-
-            Message message = iterator.next();
+        for (Message message : separatingQueue) {
 
             /* Get the source's PID to increase efficiency */
             long sourcePid = message.getPid();
@@ -172,17 +170,18 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                         System.out.println("Following are the link states:");
 
                         /* Print the states of the incoming links */
-                        for (Iterator<Map.Entry<String, Queue<Message>>> entryIterator = incomingLinks.entrySet().iterator(); iterator.hasNext(); ) {
+                        for (Iterator<Map.Entry<String, Queue<Message>>> entryIterator = incomingLinks.entrySet().iterator(); entryIterator.hasNext(); ) {
                             Map.Entry<String, Queue<Message>> pair = entryIterator.next();
 
                             Queue<Message> queue = pair.getValue();
 
-                            System.out.print("Incoming link from " + pair.getKey() + " ");
+                            System.out.println("(" + pid + ") Incoming link from " + pair.getKey());
 
                             for (Message queueMessage : queue)
-                                System.out.print(" : " + queueMessage.getsClock());
+                                System.out.println("(" + pid + ") : " + queueMessage.getsClock());
 
                             queue.clear();
+                            entryIterator.remove();
                         }
                     }
                 } else
@@ -216,8 +215,6 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                         new HashSet<String>(Arrays.asList(message.getProcName(), name))
                 );
             }
-
-            iterator.remove();
         }
 
     }
@@ -265,8 +262,23 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
     }
 
+    private void sendMarker() throws RemoteException {
+
+        Message markerMessage = new Message(pid, name, sClock++, MessageType.MARKER, "This is a marker message");
+
+        lastRecordedState = Arrays.copyOf(state, state.length);
+        localStateRecorded = true;
+
+        for (Map.Entry<String, CommunicationChannel> stringCommunicationChannelEntry : outgoingLinks.entrySet())
+            if (!stringCommunicationChannelEntry.getKey().equals(name))
+                stringCommunicationChannelEntry.getValue().sendMessage(markerMessage);
+
+    }
+
     @Override
     public void run() {
+
+
 
         /* Find peers, and establish incoming, and outgoing connections to them */
         try {
@@ -278,6 +290,13 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
             System.exit(0xFF);
         }
+
+        if (pid == 0)
+            try {
+                sendMarker();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
 
         /* The infinite loop */
         while(true) {

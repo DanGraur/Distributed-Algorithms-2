@@ -48,12 +48,13 @@ public class Main {
             /* Create the thread and run it */
             Thread componentThread = new Thread(component);
 
-            componentThread.start();
-
             /* Add it to the list of threads */
             componentThreads.add(componentThread);
         }
 
+        for (Thread componentThread : componentThreads) {
+            componentThread.start();
+        }
 
 
         /* Once all of the references have been created join them */
