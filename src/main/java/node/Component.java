@@ -5,7 +5,6 @@ import node.message.MessageType;
 import node.remote.CommunicationChannel;
 
 import java.io.Serializable;
-import java.lang.reflect.Array;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
@@ -94,8 +93,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
          * Assume that in the first half one holds the last received time message
          * from that process, and in the latter half, the last sent message
          */
-        this.state = new long[numberOfProcesses - 1];
-        this.state = new long[numberOfProcesses - 1];
+        this.state = new long[2 * numberOfProcesses];
     }
 
     /**
@@ -170,7 +168,22 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
                     /* If no more processes require ack */
                     if (awaitingMarker.isEmpty()) {
-                        // TODO: add state aggregation; i.e. collect all states and write them to permanent storage
+                        System.out.println("Finished recording my own state: " + Arrays.toString(lastRecordedState));
+                        System.out.println("Following are the link states:");
+
+                        /* Print the states of the incoming links */
+                        for (Iterator<Map.Entry<String, Queue<Message>>> entryIterator = incomingLinks.entrySet().iterator(); iterator.hasNext(); ) {
+                            Map.Entry<String, Queue<Message>> pair = entryIterator.next();
+
+                            Queue<Message> queue = pair.getValue();
+
+                            System.out.print("Incoming link from " + pair.getKey() + " ");
+
+                            for (Message queueMessage : queue)
+                                System.out.print(" : " + queueMessage.getsClock());
+
+                            queue.clear();
+                        }
                     }
                 } else
                     /* Add the message to its corresponding queue */
