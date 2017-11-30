@@ -194,6 +194,9 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
 
                             queue.clear();
                             entryIterator.remove();
+
+                            /* The process is no longer recording its state */
+                            localStateRecorded = false;
                         }
                     }
                 } else
