@@ -131,11 +131,16 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                 );
         }
 
+        log.println(new Date().toString() + " LINKS: My Incoming Links:");
+        incomingLinks.forEach((key, value) -> log.println(new Date().toString() + String.format("(%d) Incoming: %s", pid, key)));
         System.out.println(String.format("(%d) Printing my incoming links;", pid));
         incomingLinks.forEach((key, value) -> System.out.println(String.format("(%d) Incoming: %s", pid, key)));
 
+        log.println(new Date().toString() + " LINKS: My outgoing Links:");
+        incomingLinks.forEach((key, value) -> log.println(new Date().toString() + String.format("(%d) Outgoing: %s", pid, key)));
         System.out.println(String.format("(%d) Printing my outgoing links;", pid));
         outgoingLinks.forEach((key, value) -> System.out.println(String.format("(%d) Outgoing: %s", pid, key)));
+        log.flush();
         
     }
 
@@ -206,8 +211,14 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                         /* Print the states of the incoming links */
                         log.println(new Date().toString() + " Now printing all states of the incoming links: ");
 
+                        if(incomingLinks.isEmpty()){
+                            System.out.println(" EMPTY -----------------------");
+
+                        }
+
                         for (Iterator<Map.Entry<String, Queue<Message>>> entryIterator = incomingLinks.entrySet().iterator();
                              entryIterator.hasNext(); ) {
+                            //System.out.println("--------------------------------------------------------------");
                             Map.Entry<String, Queue<Message>> pair = entryIterator.next();
 
                             Queue<Message> queue = pair.getValue();
@@ -223,9 +234,11 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
                                     System.out.println("(" + pid + ") : " + queueMessage.getsClock());
                                 }
                             }
-
                             queue.clear();
-                            entryIterator.remove();
+//                            System.out.println(incomingLinks.size());
+//                            entryIterator.remove();
+//                            System.out.println(incomingLinks.size());
+
                         }
 
                         /* The process is no longer recording its state */
@@ -274,10 +287,6 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             }
             log.flush();
         }
-
-//        synchronized (separatingQueue) {
-//            separatingQueue.clear();
-//        }
 
     }
 
@@ -329,6 +338,8 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         // Randomly send a message as process 0
         if(pid == 0){
             try{
+                log.println(new Date().toString() + " This component has send the first REGULAR message. ");
+                log.flush();
                 Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "First message from component" + pid);
                 sendMessage(message);
             } catch (RemoteException e){
@@ -365,6 +376,8 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             }
 
             try{
+                log.println(new Date().toString() + " This component has send the second REGULAR message. ");
+                log.flush();
                 Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "Second message from component " + pid);
                 sendMessage(message);
             } catch (RemoteException e){
