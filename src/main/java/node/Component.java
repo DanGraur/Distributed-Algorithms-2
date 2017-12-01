@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.rmi.NotBoundException;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
 import java.util.*;
@@ -202,6 +201,10 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             entryIterator.hasNext();){
             Map.Entry<String, CommunicationChannel> pair = entryIterator.next();
 
+            int index = Integer.parseInt(pair.getKey());
+
+            state[index] = message.getsClock();
+
             pair.getValue().sendMessage(message);
         }
     }
@@ -221,7 +224,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             long sourcePid = message.getPid();
 
             /* We should check that indeed the new value will be maximal. It should never happen, but just to make sure */
-            state[(int) sourcePid * 2] = Math.max(message.getsClock(), state[(int) sourcePid * 2]);
+            state[(int) sourcePid + outgoingLinks.size()] = Math.max(message.getsClock(), state[(int) sourcePid + outgoingLinks.size()]);
 
             /* If the system is currently recording its state */
             if (localStateRecorded) {
@@ -331,8 +334,12 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
     private void sendMessageToEveryoneWithExceptions(Message message, Set exception) throws RemoteException {
 
         for (Map.Entry<String, CommunicationChannel> stringCommunicationChannelEntry : outgoingLinks.entrySet())
-            if (!exception.contains(stringCommunicationChannelEntry.getKey()))
+            if (!exception.contains(stringCommunicationChannelEntry.getKey())) {
+                int index = Integer.parseInt(stringCommunicationChannelEntry.getKey());
+                state[index] = sClock;
+
                 stringCommunicationChannelEntry.getValue().sendMessage(message);
+            }
 
     }
 
@@ -344,8 +351,12 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
         localStateRecorded = true;
 
         for (Map.Entry<String, CommunicationChannel> stringCommunicationChannelEntry : outgoingLinks.entrySet())
-            if (!stringCommunicationChannelEntry.getKey().equals(name))
+            if (!stringCommunicationChannelEntry.getKey().equals(name)) {
+                int index = Integer.parseInt(stringCommunicationChannelEntry.getKey());
+                state[index] = sClock;
+
                 stringCommunicationChannelEntry.getValue().sendMessage(markerMessage);
+            }
 
     }
 
@@ -371,7 +382,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             try{
                 log.println(new Date().toString() + " This component has send the first REGULAR message. ");
                 log.flush();
-                Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "First message from component" + pid);
+                Message message = new Message(pid, name, ++sClock, MessageType.REGULAR, "First message from component" + pid);
                 sendMessageToOutgoingLinks(message);
             } catch (RemoteException e){
                 e.printStackTrace();
@@ -409,7 +420,7 @@ public class Component implements CommunicationChannel, Runnable, Serializable {
             try{
                 log.println(new Date().toString() + " This component has send the second REGULAR message. ");
                 log.flush();
-                Message message = new Message(pid, name, sClock++, MessageType.REGULAR, "Second message from component " + pid);
+                Message message = new Message(pid, name, ++sClock, MessageType.REGULAR, "Second message from component " + pid);
                 sendMessageToOutgoingLinks(message);
             } catch (RemoteException e){
                 e.printStackTrace();
